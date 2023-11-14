@@ -3,13 +3,12 @@ pub mod monolithic_exec;
 
 use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
+use atlas_smr_application::app::{Application, Request, Reply, UpdateBatch, BatchReplies, UpdateReply, UnorderedBatch};
 use scoped_threadpool::Pool;
 use atlas_common::channel;
 use atlas_common::collections::HashMap;
-use atlas_common::globals::ReadOnly;
 use atlas_common::ordering::{Orderable, SeqNo};
-use atlas_execution::app::{Application, BatchReplies, Reply, Request, UnorderedBatch, UpdateBatch, UpdateReply};
-use atlas_execution::serialize::ApplicationData;
+
 
 /// How many threads should we use in the execution threadpool
 const THREAD_POOL_THREADS: u32 = 4;
@@ -181,7 +180,7 @@ fn scalable_execution<'a, A, S>(thread_pool: &mut Pool, application: &A, state: 
 
     let mut replies = BatchReplies::with_capacity(batch.len());
 
-    let (tx, rx) = channel::new_bounded_sync(batch.len());
+    let (tx, rx) = channel::new_bounded_sync(batch.len(), Some("batch"));
 
     let mut updates = batch.into_inner();
 
@@ -249,7 +248,7 @@ fn scalable_execution<'a, A, S>(thread_pool: &mut Pool, application: &A, state: 
 fn scalable_unordered_execution<A, S>(thread_pool: &mut Pool, application: &A, state: &S, batch: UnorderedBatch<Request<A, S>>) -> BatchReplies<Reply<A, S>>
     where A: Application<S> + Sync, S: Send + Sync  {
     let mut replies = BatchReplies::with_capacity(batch.len());
-    let (tx, rx) = channel::new_bounded_sync(batch.len());
+    let (tx, rx) = channel::new_bounded_sync(batch.len(), Some("batch unordered"));
 
     thread_pool.scoped(|scope| {
         batch.into_inner().into_iter().enumerate().for_each(|(pos, request)| {

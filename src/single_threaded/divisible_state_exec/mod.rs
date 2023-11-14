@@ -4,12 +4,13 @@ use std::time::Instant;
 use atlas_common::channel;
 use atlas_common::channel::{ChannelSyncRx, ChannelSyncTx};
 use atlas_common::error::*;
+use atlas_common::maybe_vec::MaybeVec;
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_core::smr::exec::ReplyNode;
-use atlas_execution::{ExecutionRequest, ExecutorHandle};
-use atlas_execution::app::{Application, BatchReplies, Reply, Request};
-use atlas_execution::state::divisible_state::{AppStateMessage, DivisibleState, DivisibleStateDescriptor, InstallStateMessage};
 use atlas_metrics::metrics::metric_duration;
+use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
+use atlas_smr_application::app::{Application, Request, BatchReplies, Reply};
+use atlas_smr_application::state::divisible_state::{DivisibleState, InstallStateMessage, AppStateMessage, AppState};
 use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
@@ -37,7 +38,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     where S: DivisibleState + 'static + Send,
           A: Application<S> + 'static + Send {
     pub fn init_handle() -> (ExecutorHandle<A::AppData>, ChannelSyncRx<ExecutionRequest<Request<A, S>>>) {
-        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER);
+        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER, Some("exec_buffer"));
 
         (ExecutorHandle::new(tx), rx)
     }
@@ -56,9 +57,9 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
             (A::initial_state()?, vec![])
         };
 
-        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER);
+        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
 
-        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER);
+        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
 
         let descriptor = state.get_descriptor().clone();
 
@@ -86,7 +87,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                             while let Ok(state_recvd) = executor.state_rx.recv() {
                                 match state_recvd {
                                     InstallStateMessage::StatePart(state_part) => {
-                                        executor.state.accept_parts(state_part).expect("Failed to install state parts into executor");
+                                        executor.state.accept_parts(state_part.into_vec().into_boxed_slice()).expect("Failed to install state parts into executor");
                                     }
                                     InstallStateMessage::Done => break
                                 }
@@ -94,7 +95,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                         }
                         ExecutionRequest::CatchUp(requests) => {
                             for req in requests {
-                                executor.application.update(&mut executor.state, req);
+                                executor.application.update_batch(&mut executor.state, req);
                             }
                         }
                         ExecutionRequest::Update((batch, instant)) => {
@@ -150,13 +151,10 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     ///Clones the current state and delivers it to the application
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) {
-        let current_state = self.state.prepare_checkpoint().expect("Failed to prepare state checkpoint").clone();
 
-        let diff = self.last_checkpoint_descriptor.compare_descriptors(&current_state);
-
-        let parts = self.state.get_parts(&diff).expect("Failed to get necessary parts");
-
-        self.checkpoint_tx.send(AppStateMessage::new(seq, current_state.clone(), parts)).expect("Failed to send checkpoint");
+        let parts = self.state.get_parts().expect("Failed to get necessary parts");
+        let state = AppState::StatePart(MaybeVec::from_many(parts));
+        self.checkpoint_tx.send(AppStateMessage::new(seq, state)).expect("Failed to send checkpoint");
     }
 
     fn execution_finished<T>(&self, seq: Option<SeqNo>, batch: BatchReplies<Reply<A, S>>)

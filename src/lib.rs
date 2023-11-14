@@ -6,13 +6,12 @@ use atlas_common::threadpool;
 use atlas_common::error::*;
 use atlas_core::messages::ReplyMessage;
 use atlas_core::smr::exec::{ReplyNode, ReplyType};
-use atlas_execution::app::{Application, BatchReplies, Request};
-use atlas_execution::{ExecutionRequest, ExecutorHandle};
-use atlas_execution::serialize::ApplicationData;
-use atlas_execution::state as state;
-use atlas_execution::state::divisible_state::{DivisibleState};
-use atlas_execution::state::monolithic_state::{AppStateMessage, InstallStateMessage, MonolithicState};
 use atlas_metrics::metrics::metric_duration;
+use atlas_smr_application::serialize::ApplicationData;
+use atlas_smr_application::state::monolithic_state::{MonolithicState, InstallStateMessage, AppStateMessage};
+use atlas_smr_application::{ExecutorHandle, ExecutionRequest, state};
+use atlas_smr_application::app::{Application, Request, BatchReplies};
+use atlas_smr_application::state::divisible_state::DivisibleState;
 use crate::metric::REPLIES_SENT_TIME_ID;
 use crate::scalable::{CRUDState, ScalableApp};
 

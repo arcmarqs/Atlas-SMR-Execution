@@ -1,5 +1,8 @@
 use std::sync::Arc;
 use std::time::Instant;
+use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
+use atlas_smr_application::app::{Application, Request, AppData, BatchReplies, Reply};
+use atlas_smr_application::state::monolithic_state::{MonolithicState, InstallStateMessage, AppStateMessage};
 use log::info;
 use scoped_threadpool::Pool;
 use atlas_common::channel;
@@ -7,9 +10,7 @@ use atlas_common::channel::{ChannelSyncRx, ChannelSyncTx};
 use atlas_common::error::*;
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_core::smr::exec::ReplyNode;
-use atlas_execution::app::{AppData, Application, BatchReplies, Reply, Request};
-use atlas_execution::{ExecutionRequest, ExecutorHandle};
-use atlas_execution::state::monolithic_state::{AppStateMessage, InstallStateMessage, MonolithicState};
+
 use atlas_metrics::metrics::metric_duration;
 use crate::ExecutorReplier;
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
@@ -38,7 +39,7 @@ impl<S, A, NT> ScalableMonolithicExecutor<S, A, NT>
           A: ScalableApp<S> + 'static + Send,
           NT: 'static {
     pub fn init_handle() -> (ExecutorHandle<AppData<A, S>>, ChannelSyncRx<ExecutionRequest<Request<A, S>>>) {
-        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER);
+        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER, Some("executing buffer"));
 
         (ExecutorHandle::new(tx), rx)
     }
@@ -57,9 +58,9 @@ impl<S, A, NT> ScalableMonolithicExecutor<S, A, NT>
             (<A as Application<S>>::initial_state()?, vec![])
         };
 
-        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER);
+        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("State Buffer"));
 
-        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER);
+        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("State Buffer"));
 
         let mut executor = ScalableMonolithicExecutor {
             application: service,
@@ -97,7 +98,7 @@ impl<S, A, NT> ScalableMonolithicExecutor<S, A, NT>
                             info!("Catching up with {} requests", requests.len());
 
                             for req in requests {
-                                self.application.update(&mut self.state, req);
+                                self.application.update_batch(&mut self.state, req);
                             }
                         }
                         ExecutionRequest::Update((batch, instant)) => {
