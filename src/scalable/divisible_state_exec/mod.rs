@@ -35,8 +35,6 @@ pub struct ScalableDivisibleStateExecutor<S, A, NT>
     thread_pool: Pool,
 
     send_node: Arc<NT>,
-
-    last_checkpoint_descriptor: S::StateDescriptor,
 }
 
 impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
@@ -66,8 +64,6 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
 
         let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("checkpoint"));
 
-        let descriptor = state.get_descriptor().clone();
-
         let mut executor = ScalableDivisibleStateExecutor {
             application: service,
             state,
@@ -76,7 +72,6 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
             checkpoint_tx,
             thread_pool: Pool::new(THREAD_POOL_THREADS),
             send_node,
-            last_checkpoint_descriptor: descriptor,
         };
 
         for request in requests {
@@ -160,7 +155,10 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
     ///Clones the current state and delivers it to the application
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) {
+        let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
+        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
 
+        
         let parts = self.state.get_parts().expect("Failed to get necessary parts");
         let state = AppState::StatePart(MaybeVec::from_many(parts));
         self.checkpoint_tx.send(AppStateMessage::new(seq, state)).expect("Failed to send checkpoint");
