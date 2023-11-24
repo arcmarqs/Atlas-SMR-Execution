@@ -102,6 +102,7 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
                                         self.state.finalize_transfer();
                                         break
                                     }
+                                    InstallStateMessage::StateDescriptor(_) => todo!(),
                                 }
                             }
                         }

@@ -88,6 +88,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                                         executor.state.finalize_transfer();
                                         break
                                     }
+                                    InstallStateMessage::StateDescriptor(_) => todo!(),
                                 }
                             }
                         }
