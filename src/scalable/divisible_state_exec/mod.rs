@@ -98,7 +98,10 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
                                     InstallStateMessage::StatePart(state_part) => {
                                         self.state.accept_parts(state_part.into_vec().into_boxed_slice()).expect("Failed to install state parts into executor");
                                     }
-                                    InstallStateMessage::Done => break
+                                    InstallStateMessage::Done => {
+                                        self.state.finalize_transfer();
+                                        break
+                                    }
                                 }
                             }
                         }
@@ -155,13 +158,15 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
     ///Clones the current state and delivers it to the application
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) {
-        let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
-        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
-
-        
         let parts = self.state.get_parts().expect("Failed to get necessary parts");
+        let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
+
+        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
+        
         self.checkpoint_tx.send(AppStateMessage::new(seq, state)).expect("Failed to send checkpoint");
+
+        self.checkpoint_tx.send(AppStateMessage::new(seq, AppState::Done)).expect("Failed to notify end of checkpoint");
     }
 
     fn execution_finished<T>(&self, seq: Option<SeqNo>, batch: BatchReplies<Reply<A, S>>)
