@@ -85,7 +85,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                                         executor.state.accept_parts(state_part.into_vec().into_boxed_slice()).expect("Failed to install state parts into executor");
                                     }
                                     InstallStateMessage::Done => {
-                                        executor.state.finalize_transfer();
+                                        executor.state.finalize_transfer().expect("State is corrupted");
                                         break
                                     }
                                     InstallStateMessage::StateDescriptor(_) => todo!(),
@@ -99,7 +99,6 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                         }
                         ExecutionRequest::Update((batch, instant)) => {
                             let seq_no = batch.sequence_number();
-
                             metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
 
                             let start = Instant::now();
@@ -154,10 +153,9 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
-        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
         
         self.checkpoint_tx.send(AppStateMessage::new(seq, state)).expect("Failed to send checkpoint");
-
+        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
         self.checkpoint_tx.send(AppStateMessage::new(seq, AppState::Done)).expect("Failed to notify end of checkpoint");
     }
 
