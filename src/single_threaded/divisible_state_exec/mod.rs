@@ -9,9 +9,8 @@ use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_core::smr::exec::ReplyNode;
 use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
 use atlas_smr_application::app::{Application, BatchReplies, Reply, Request};
-use atlas_smr_application::state::divisible_state::{AppState, AppStateMessage, DivisibleState, DivisibleStateDescriptor, InstallStateMessage};
+use atlas_smr_application::state::divisible_state::{AppState, AppStateMessage, DivisibleState, InstallStateMessage};
 use atlas_metrics::metrics::metric_duration;
-use atlas_smr_application::serialize::ApplicationData;
 use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
@@ -170,9 +169,9 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc).unwrap());
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state).unwrap());
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state));
 
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }

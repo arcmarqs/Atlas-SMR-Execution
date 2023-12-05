@@ -10,17 +10,14 @@ use scoped_threadpool::Pool;
 use atlas_common::channel;
 use atlas_common::channel::{ChannelSyncRx, ChannelSyncTx};
 use atlas_common::error::*;
-use atlas_common::maybe_vec::MaybeVec;
+
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_core::smr::exec::ReplyNode;
-use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
-use atlas_smr_application::app::{AppData, Application, BatchReplies, Reply, Request};
-use atlas_smr_application::state::divisible_state::{AppState, AppStateMessage, DivisibleState, DivisibleStateDescriptor, InstallStateMessage};
 use atlas_metrics::metrics::metric_duration;
 
 use crate::ExecutorReplier;
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
-use crate::scalable::{CRUDState, ExecutionUnit, scalable_execution, scalable_unordered_execution, ScalableApp, THREAD_POOL_THREADS};
+use crate::scalable::{CRUDState, scalable_execution, scalable_unordered_execution, ScalableApp, THREAD_POOL_THREADS};
 
 const EXECUTING_BUFFER: usize = 16384;
 const STATE_BUFFER: usize = 128;
@@ -181,9 +178,9 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc).unwrap());
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state).unwrap());
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state));
 
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }

@@ -8,8 +8,6 @@ use scoped_threadpool::Pool;
 use atlas_common::channel;
 use atlas_common::collections::HashMap;
 use atlas_common::ordering::{Orderable, SeqNo};
-use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UnorderedBatch, UpdateBatch, UpdateReply};
-use atlas_smr_application::serialize::ApplicationData;
 
 /// How many threads should we use in the execution threadpool
 const THREAD_POOL_THREADS: u32 = 4;
