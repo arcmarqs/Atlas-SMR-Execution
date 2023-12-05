@@ -16,7 +16,9 @@ use atlas_common::channel::{ChannelSyncRx, ChannelSyncTx};
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_communication::protocol_node::ProtocolNetworkNode;
 use atlas_core::smr::exec::ReplyNode;
-
+use atlas_smr_application::app::{Application, BatchReplies, Reply, Request};
+use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
+use atlas_smr_application::state::monolithic_state::{AppStateMessage, InstallStateMessage, MonolithicState};
 use atlas_metrics::metrics::metric_duration;
 use crate::ExecutorReplier;
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
@@ -42,7 +44,8 @@ impl<S, A, NT> MonolithicExecutor<S, A, NT>
           A: Application<S> + 'static + Send,
           NT: 'static {
     pub fn init_handle() -> (ExecutorHandle<A::AppData>, ChannelSyncRx<ExecutionRequest<Request<A, S>>>) {
-        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER, Some("exec_buffer"));
+        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER,
+                                                 Some("ST Monolithic Executor Work Channel"));
 
         (ExecutorHandle::new(tx), rx)
     }
@@ -61,9 +64,11 @@ impl<S, A, NT> MonolithicExecutor<S, A, NT>
             (A::initial_state()?, vec![])
         };
 
-        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
+        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER,
+                                                             Some("ST Monolithic Executor Work InstState"));
 
-        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
+        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
+                                                                       Some("ST Monolithic Executor AppState"));
 
         let mut executor = MonolithicExecutor {
             application: service,
@@ -90,10 +95,18 @@ impl<S, A, NT> MonolithicExecutor<S, A, NT>
                             }
                         }
                         ExecutionRequest::CatchUp(requests) => {
-                            info!("Catching up with {} requests", requests.len());
+                            info!("Catching up with {} batches of requests", requests.len());
 
-                            for req in requests {
-                                executor.application.update_batch(&mut executor.state, req);
+                            for batch in requests {
+                                let seq_no = batch.sequence_number();
+
+                                let start = Instant::now();
+
+                                let reply_batch = executor.application.update_batch(&mut executor.state, batch);
+
+                                metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
+
+                                executor.execution_finished::<T>(Some(seq_no), reply_batch);
                             }
                         }
                         ExecutionRequest::Update((batch, instant)) => {
@@ -152,7 +165,7 @@ impl<S, A, NT> MonolithicExecutor<S, A, NT>
     fn deliver_checkpoint_state(&self, seq: SeqNo) {
         let cloned_state = self.state.clone();
 
-        self.checkpoint_tx.send(AppStateMessage::new(seq, cloned_state)).expect("Failed to send checkpoint");
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, cloned_state)).expect("Failed to send checkpoint");
     }
 
     fn execution_finished<T>(&self, seq: Option<SeqNo>, batch: BatchReplies<Reply<A, S>>)

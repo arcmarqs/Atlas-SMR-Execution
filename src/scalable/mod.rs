@@ -8,7 +8,8 @@ use scoped_threadpool::Pool;
 use atlas_common::channel;
 use atlas_common::collections::HashMap;
 use atlas_common::ordering::{Orderable, SeqNo};
-
+use atlas_smr_application::app::{Application, BatchReplies, Reply, Request, UnorderedBatch, UpdateBatch, UpdateReply};
+use atlas_smr_application::serialize::ApplicationData;
 
 /// How many threads should we use in the execution threadpool
 const THREAD_POOL_THREADS: u32 = 4;
@@ -180,7 +181,7 @@ fn scalable_execution<'a, A, S>(thread_pool: &mut Pool, application: &A, state: 
 
     let mut replies = BatchReplies::with_capacity(batch.len());
 
-    let (tx, rx) = channel::new_bounded_sync(batch.len(), Some("batch"));
+    let (tx, rx) = channel::new_bounded_sync(batch.len(), None);
 
     let mut updates = batch.into_inner();
 
@@ -206,7 +207,7 @@ fn scalable_execution<'a, A, S>(thread_pool: &mut Pool, application: &A, state: 
 
                 let reply = application.speculatively_execute(&mut exec_unit, request.operation().clone());
 
-                tx.send((pos, exec_unit.complete(), UpdateReply::init(request.from(), request.session_id(), request.operation_id(), reply))).unwrap();
+                tx.send_return((pos, exec_unit.complete(), UpdateReply::init(request.from(), request.session_id(), request.operation_id(), reply))).unwrap();
             });
         });
 
@@ -248,7 +249,7 @@ fn scalable_execution<'a, A, S>(thread_pool: &mut Pool, application: &A, state: 
 fn scalable_unordered_execution<A, S>(thread_pool: &mut Pool, application: &A, state: &S, batch: UnorderedBatch<Request<A, S>>) -> BatchReplies<Reply<A, S>>
     where A: Application<S> + Sync, S: Send + Sync  {
     let mut replies = BatchReplies::with_capacity(batch.len());
-    let (tx, rx) = channel::new_bounded_sync(batch.len(), Some("batch unordered"));
+    let (tx, rx) = channel::new_bounded_sync(batch.len(), None);
 
     thread_pool.scoped(|scope| {
         batch.into_inner().into_iter().enumerate().for_each(|(pos, request)| {
@@ -257,7 +258,7 @@ fn scalable_unordered_execution<A, S>(thread_pool: &mut Pool, application: &A, s
 
                 let reply = speculatively_execute_unordered::<A, S>(application, state, op);
 
-                tx.clone().send(UpdateReply::init(from, session, op_id, reply)).unwrap();
+                tx.clone().send_return(UpdateReply::init(from, session, op_id, reply)).unwrap();
             });
         });
 

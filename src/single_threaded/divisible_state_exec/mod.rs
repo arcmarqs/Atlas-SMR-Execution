@@ -7,16 +7,19 @@ use atlas_common::error::*;
 use atlas_common::maybe_vec::MaybeVec;
 use atlas_common::ordering::{Orderable, SeqNo};
 use atlas_core::smr::exec::ReplyNode;
-use atlas_metrics::metrics::metric_duration;
 use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
-use atlas_smr_application::app::{Application, Request, BatchReplies, Reply};
-use atlas_smr_application::state::divisible_state::{DivisibleState, InstallStateMessage, AppStateMessage, AppState};
+use atlas_smr_application::app::{Application, BatchReplies, Reply, Request};
+use atlas_smr_application::state::divisible_state::{AppState, AppStateMessage, DivisibleState, DivisibleStateDescriptor, InstallStateMessage};
+use atlas_metrics::metrics::metric_duration;
+use atlas_smr_application::serialize::ApplicationData;
 use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
 
 const EXECUTING_BUFFER: usize = 16384;
 const STATE_BUFFER: usize = 128;
+
+const PARTS_PER_DELIVERY: usize = 4;
 
 pub struct DivisibleStateExecutor<S, A, NT>
     where S: DivisibleState + 'static,
@@ -36,7 +39,8 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     where S: DivisibleState + 'static + Send,
           A: Application<S> + 'static + Send {
     pub fn init_handle() -> (ExecutorHandle<A::AppData>, ChannelSyncRx<ExecutionRequest<Request<A, S>>>) {
-        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER, Some("exec_buffer"));
+        let (tx, rx) = channel::new_bounded_sync(EXECUTING_BUFFER,
+        Some("Divisible State ST Exec Work"));
 
         (ExecutorHandle::new(tx), rx)
     }
@@ -55,9 +59,11 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
             (A::initial_state()?, vec![])
         };
 
-        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
+        let (state_tx, state_rx) = channel::new_bounded_sync(STATE_BUFFER,
+        Some("Divisible state ST InsState"));
 
-        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER, Some("state_buffer"));
+        let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
+        Some("Divisible State ST AppState"));
 
         let mut executor = DivisibleStateExecutor {
             application: service,
@@ -81,6 +87,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                             // Receive all state updates that are available
                             while let Ok(state_recvd) = executor.state_rx.recv() {
                                 match state_recvd {
+                                    InstallStateMessage::StateDescriptor(_) => {}
                                     InstallStateMessage::StatePart(state_part) => {
                                         executor.state.accept_parts(state_part.into_vec().into_boxed_slice()).expect("Failed to install state parts into executor");
                                     }
@@ -93,9 +100,19 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                             }
                         }
                         ExecutionRequest::CatchUp(requests) => {
-                            for req in requests {
-                                executor.application.update_batch(&mut executor.state, req);
+
+                            for batch in requests.into_iter() {
+                                let seq_no = batch.sequence_number();
+
+                                let start = Instant::now();
+
+                                let reply_batch = executor.application.update_batch(&mut executor.state, batch);
+
+                                metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
+
+                                executor.execution_finished::<T>(Some(seq_no), reply_batch);
                             }
+
                         }
                         ExecutionRequest::Update((batch, instant)) => {
                             let seq_no = batch.sequence_number();
@@ -153,10 +170,11 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
-        
-        self.checkpoint_tx.send(AppStateMessage::new(seq, state)).expect("Failed to send checkpoint");
-        self.checkpoint_tx.send(AppStateMessage::new(seq,desc)).expect("Failed to send checkpoint");
-        self.checkpoint_tx.send(AppStateMessage::new(seq, AppState::Done)).expect("Failed to notify end of checkpoint");
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc).unwrap());
+
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state).unwrap());
+
+        self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }
 
     fn execution_finished<T>(&self, seq: Option<SeqNo>, batch: BatchReplies<Reply<A, S>>)
