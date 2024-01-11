@@ -94,7 +94,6 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                                         executor.state.finalize_transfer().expect("State is corrupted");
                                         break
                                     }
-                                    InstallStateMessage::StateDescriptor(_) => todo!(),
                                 }
                             }
                         }
