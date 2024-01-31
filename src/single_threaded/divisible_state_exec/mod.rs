@@ -11,6 +11,7 @@ use atlas_smr_application::{ExecutionRequest, ExecutorHandle};
 use atlas_smr_application::app::{Application, BatchReplies, Reply, Request};
 use atlas_smr_application::state::divisible_state::{AppState, AppStateMessage, DivisibleState, InstallStateMessage};
 use atlas_metrics::metrics::metric_duration;
+use scoped_threadpool::Pool;
 use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
@@ -30,6 +31,8 @@ pub struct DivisibleStateExecutor<S, A, NT>
     work_rx: ChannelSyncRx<ExecutionRequest<Request<A, S>>>,
     state_rx: ChannelSyncRx<InstallStateMessage<S>>,
     checkpoint_tx: ChannelSyncTx<AppStateMessage<S>>,
+
+    checkpoint_threadpool: Pool,
 
     send_node: Arc<NT>,
 }
@@ -64,12 +67,15 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
         Some("Divisible State ST AppState"));
 
+        let checkpoint_threadpool = Pool::new(4);
+
         let mut executor = DivisibleStateExecutor {
             application: service,
             state,
             work_rx: handle,
             state_rx,
             checkpoint_tx,
+            checkpoint_threadpool,
             send_node,
         };
 
@@ -164,7 +170,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     ///Clones the current state and delivers it to the application
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) { 
-        let parts = self.state.get_parts().expect("Failed to get necessary parts");
+        let parts = self.state.get_parts(&mut self.checkpoint_threadpool).expect("Failed to get necessary parts");
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
