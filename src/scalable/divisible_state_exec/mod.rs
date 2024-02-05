@@ -22,7 +22,7 @@ use crate::scalable::{CRUDState, scalable_execution, scalable_unordered_executio
 const EXECUTING_BUFFER: usize = 16384;
 const STATE_BUFFER: usize = 128;
 
-const PARTS_PER_DELIVERY: usize = 4;
+const PARTS_PER_DELIVERY: usize = 6;
 
 pub struct ScalableDivisibleStateExecutor<S, A, NT>
     where S: DivisibleState + CRUDState + 'static + Send + Sync,
