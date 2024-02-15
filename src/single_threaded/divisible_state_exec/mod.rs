@@ -67,7 +67,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
         Some("Divisible State ST AppState"));
 
-        let checkpoint_threadpool = Pool::new(4);
+        let checkpoint_threadpool = Pool::new(6);
 
         let mut executor = DivisibleStateExecutor {
             application: service,
