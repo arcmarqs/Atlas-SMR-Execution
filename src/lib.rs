@@ -13,7 +13,7 @@ use atlas_smr_application::state as state;
 use atlas_smr_application::state::divisible_state::{DivisibleState};
 use atlas_smr_application::state::monolithic_state::{AppStateMessage, InstallStateMessage, MonolithicState};
 use atlas_metrics::metrics::metric_duration;
-use crate::metric::REPLIES_SENT_TIME_ID;
+//use crate::metric::REPLIES_SENT_TIME_ID;
 use crate::scalable::{CRUDState, ScalableApp};
 
 pub mod single_threaded;
@@ -226,7 +226,7 @@ impl ExecutorReplier for ReplicaReplier {
                 unreachable!();
             }
 
-            metric_duration(REPLIES_SENT_TIME_ID, start.elapsed());
+            //metric_duration(REPLIES_SENT_TIME_ID, start.elapsed());
         });
     }
 }
