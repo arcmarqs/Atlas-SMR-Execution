@@ -171,12 +171,14 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) { 
         let parts = self.state.get_parts(&mut self.checkpoint_threadpool).expect("Failed to get necessary parts");
-        let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
         let state = AppState::StatePart(MaybeVec::from_many(parts));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
+        let _ = self.checkpoint_tx.send_return(AppStateMessage::new(seq, state));
 
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state));
+        let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
+
+        let _ = self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
+
 
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }
