@@ -174,13 +174,9 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
     ///Clones the current state and delivers it to the application
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) {
-        let parts = self.state.get_parts(&mut self.thread_pool).expect("Failed to get necessary parts");
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
-        let state = AppState::StatePart(MaybeVec::from_many(parts));
-
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
-
-        self.checkpoint_tx.send_return(AppStateMessage::new(seq, state));
+        self.state.get_parts(&mut self.checkpoint_threadpool, self.checkpoint_tx.clone()).expect("Failed to get necessary parts");
 
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }
