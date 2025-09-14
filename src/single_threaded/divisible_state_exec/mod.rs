@@ -31,7 +31,6 @@ pub struct DivisibleStateExecutor<S, A, NT>
     work_rx: ChannelSyncRx<ExecutionRequest<Request<A, S>>>,
     state_rx: ChannelSyncRx<InstallStateMessage<S>>,
     checkpoint_tx: ChannelSyncTx<AppStateMessage<S>>,
-
     checkpoint_threadpool: Pool,
 
     send_node: Arc<NT>,
@@ -176,7 +175,6 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
 
         let _ = self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
-
 
         self.checkpoint_tx.send_return(AppStateMessage::new(seq, AppState::Done)).expect("Failed to send checkpoint");
     }
