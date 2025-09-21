@@ -135,7 +135,6 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                             let seq_no = batch.sequence_number();
 
                             metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
-                            println!("STARTING CHECKPOINT");
                             let start = Instant::now();
 
                             let reply_batch =
