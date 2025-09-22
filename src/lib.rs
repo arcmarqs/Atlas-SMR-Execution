@@ -141,7 +141,7 @@ impl<A, S, NT> TMonolithicStateExecutor<A, S, NT> for MultiThreadedMonExecutor
     }
 }
 
-const EXECUTING_BUFFER: usize = 16384;
+const EXECUTING_BUFFER: usize = 8192;
 //const REPLY_CONCURRENCY: usize = 4;
 
 pub trait ExecutorReplier: Send {
