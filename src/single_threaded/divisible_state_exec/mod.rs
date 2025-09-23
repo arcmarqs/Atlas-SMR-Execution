@@ -16,7 +16,7 @@ use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
 
-const EXECUTING_BUFFER: usize =8192;
+const EXECUTING_BUFFER: usize = 8192;
 const STATE_BUFFER: usize = 256;
 
 const PARTS_PER_DELIVERY: usize = 4;
@@ -66,7 +66,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
         Some("Divisible State ST AppState"));
 
-        let checkpoint_threadpool = Pool::new(4);
+        let checkpoint_threadpool = Pool::new(1);
 
         let mut executor = DivisibleStateExecutor {
             application: service,
