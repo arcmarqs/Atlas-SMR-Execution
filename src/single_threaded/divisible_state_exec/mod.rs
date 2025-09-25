@@ -141,12 +141,14 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                                 executor.application.update_batch(&mut executor.state, batch);
 
                             metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
-
+                            let _profiler = dhat::Profiler::new_heap();
                             // deliver checkpoint state to the replica
                             executor.deliver_checkpoint_state(seq_no);
 
                             // deliver replies
                             executor.execution_finished::<T>(Some(seq_no), reply_batch);
+
+                            drop(_profiler);
                         }
                         ExecutionRequest::Read(_peer_id) => {
                             todo!()

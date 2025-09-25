@@ -10,6 +10,7 @@ edition = "2021"
 anyhow = "1.0.75"
 thiserror = "1.0.50"
 log = "0.4.19"
+dhat = "0.3"
 atlas-communication = { path = "../Atlas-Communication" }
 atlas-core = { path = "../Atlas-Core" }
 atlas-smr-application = { path = "../Atlas-SMR-Application" }
