@@ -16,7 +16,7 @@ use crate::ExecutorReplier;
 
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
 
-const EXECUTING_BUFFER: usize = 2048;
+const EXECUTING_BUFFER: usize = 512;
 const STATE_BUFFER: usize = 1;
 
 const PARTS_PER_DELIVERY: usize = 4;
@@ -169,7 +169,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
     /// Takes a sequence number, which corresponds to the last executed consensus instance before we performed the checkpoint
     fn deliver_checkpoint_state(&mut self, seq: SeqNo) {
         self.state.get_parts(&mut self.checkpoint_threadpool, self.checkpoint_tx.clone()).expect("Failed to get necessary parts");
-        
+
         let desc: AppState<S> = AppState::StateDescriptor(self.state.get_descriptor());
 
         let _ = self.checkpoint_tx.send_return(AppStateMessage::new(seq, desc));
