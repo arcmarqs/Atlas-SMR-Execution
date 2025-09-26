@@ -103,7 +103,7 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
                                 match state_recvd {
                                     InstallStateMessage::StateDescriptor(descriptor) => {}
                                     InstallStateMessage::StatePart(state_part) => {
-                                        self.state.accept_parts(state_part.into_vec().into_boxed_slice()).expect("Failed to install state parts into executor");
+                                        self.state.accept_parts(state_part.into_vec()).expect("Failed to install state parts into executor");
                                     }
                                     InstallStateMessage::Done => {
                                         self.state.finalize_transfer();
