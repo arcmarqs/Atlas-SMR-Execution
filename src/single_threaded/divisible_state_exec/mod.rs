@@ -93,7 +93,6 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                                 match state_recvd {
                                     InstallStateMessage::StateDescriptor(_) => {}
                                     InstallStateMessage::StatePart(state_part) => {
-                                        println!("EXECUTOR: Received state parts {:?}", state_part.len());
                                         executor.state.accept_parts(state_part.into_vec()).expect("Failed to install state parts into executor");
                                     }
                                     InstallStateMessage::Done => {
