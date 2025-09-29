@@ -19,8 +19,8 @@ use crate::ExecutorReplier;
 use crate::metric::{EXECUTION_LATENCY_TIME_ID, EXECUTION_TIME_TAKEN_ID};
 use crate::scalable::{CRUDState, scalable_execution, scalable_unordered_execution, ScalableApp, THREAD_POOL_THREADS};
 
-const EXECUTING_BUFFER: usize =2048;
-const STATE_BUFFER: usize = 8;
+const EXECUTING_BUFFER: usize =16834;
+const STATE_BUFFER: usize = 64;
 
 const PARTS_PER_DELIVERY: usize = 6;
 
