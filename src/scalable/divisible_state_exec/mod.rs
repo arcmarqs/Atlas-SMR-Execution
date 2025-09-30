@@ -106,10 +106,9 @@ impl<S, A, NT> ScalableDivisibleStateExecutor<S, A, NT>
                                         self.state.accept_parts(state_part.into_vec()).expect("Failed to install state parts into executor");
                                     }
                                     InstallStateMessage::Done => {
-                                        self.state.finalize_transfer();
+                                        let _ = self.state.finalize_transfer();
                                         break
                                     }
-                                    InstallStateMessage::StateDescriptor(_) => todo!(),
                                 }
                             }
                         }
