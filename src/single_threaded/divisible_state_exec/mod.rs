@@ -66,7 +66,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
         let (checkpoint_tx, checkpoint_rx) = channel::new_bounded_sync(STATE_BUFFER,
         Some("Divisible State ST AppState"));
 
-        let checkpoint_threadpool = Pool::new(1);
+        let checkpoint_threadpool = Pool::new(2);
 
         let mut executor = DivisibleStateExecutor {
             application: service,
@@ -106,12 +106,12 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
 
                             for batch in requests.into_iter() {
                                 let seq_no = batch.sequence_number();
-
-                                let start = Instant::now();
+                                
+                                // let start = Instant::now();
 
                                 let reply_batch = executor.application.update_batch(&mut executor.state, batch);
 
-                                metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
+                                // metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
 
                                 executor.execution_finished::<T>(Some(seq_no), reply_batch);
                             }
@@ -119,14 +119,14 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                         }
                         ExecutionRequest::Update((batch, instant)) => {
                             let seq_no = batch.sequence_number();
-                            metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
+                            // metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
 
-                            let start = Instant::now();
+                            // let start = Instant::now();
 
                             let reply_batch =
                                 executor.application.update_batch(&mut executor.state, batch);
 
-                            metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
+                            // metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
 
                             // deliver replies
                             executor.execution_finished::<T>(Some(seq_no), reply_batch);
@@ -134,13 +134,13 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                         ExecutionRequest::UpdateAndGetAppstate((batch, instant)) => {
                             let seq_no = batch.sequence_number();
 
-                            metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
-                            let start = Instant::now();
+                            // metric_duration(EXECUTION_LATENCY_TIME_ID, instant.elapsed());
+                            // let start = Instant::now();
 
                             let reply_batch =
                                 executor.application.update_batch(&mut executor.state, batch);
 
-                            metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
+                            // metric_duration(EXECUTION_TIME_TAKEN_ID, start.elapsed());
                             // deliver checkpoint state to the replica
                             executor.deliver_checkpoint_state(seq_no);
 
