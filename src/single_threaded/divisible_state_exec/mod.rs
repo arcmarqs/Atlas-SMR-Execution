@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use atlas_common::channel;
 use atlas_common::channel::{ChannelSyncRx, ChannelSyncTx};
@@ -89,7 +89,7 @@ impl<S, A, NT> DivisibleStateExecutor<S, A, NT>
                     match exec_req {
                         ExecutionRequest::PollStateChannel => {
                             // Receive all state updates that are available
-                            while let Ok(state_recvd) = executor.state_rx.recv() {
+                            while let Ok(state_recvd) = executor.state_rx.recv_timeout(Duration::from_secs(180)) {
                                 match state_recvd {
                                     InstallStateMessage::StateDescriptor(_) => {}
                                     InstallStateMessage::StatePart(state_part) => {
